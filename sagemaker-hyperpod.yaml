@@ -137,7 +137,21 @@ Parameters:
     Description:
       Creates an FSx OpenZFS file system in addition to the FSxL file system. Default is false
     Type: String
- 
+
+  CreateKeyPair:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'false'
+    Description:
+      Creates an EC2 key pair for SSH access. Default is false
+    Type: String
+
+  KeyPairName:
+    Description: Name of the EC2 key pair to create
+    Type: String
+    Default: 'hyperpod-key'
+
   OpenZFSThroughput:
     AllowedValues:
       - 160
@@ -169,6 +183,7 @@ Conditions:
   BackupSubnetCondition: !Not [ !Equals [!Ref 'BackupSubnetAZ', ''] ]
   CreateSSMDocument: !Equals [!Ref 'SSMDocumentName', 'true']
   CreateOpenZFSCondition: !Equals [!Ref 'CreateOpenZFS', 'true']
+  CreateKeyPairCondition: !Equals [!Ref 'CreateKeyPair', 'true']
 
 
 ##########################
@@ -546,6 +561,15 @@ Resources:
             windows: ""
             linux: "/bin/bash -c 'sudo su - ubuntu'"
 
+  KeyPair:
+    Type: AWS::EC2::KeyPair
+    Condition: CreateKeyPairCondition
+    Properties:
+      KeyName: !Ref KeyPairName
+      Tags:
+        - Key: Name
+          Value: !Ref KeyPairName
+
 #############
 ## Outputs ##
 #############
@@ -609,4 +633,10 @@ Outputs:
     Condition: CreateOpenZFSCondition
     Description: The DNS of the FSxOpenZFS filesystem that has been created
     Value: !GetAtt FSxOpenZFSFileSystem.DNSName
+  KeyPairName:
+    Condition: CreateKeyPairCondition
+    Description: Name of the created EC2 key pair
+    Value: !Ref KeyPair
+    Export:
+      Name: !Sub ${AWS::StackName}-KeyPairName
 
