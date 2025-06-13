@@ -649,13 +649,23 @@ EOL
     if [ -n "$SSH_KEY_NAME" ]; then
         read -e -p "Enter CIDR to allow SSH access (Default: 0.0.0.0/0): " SSH_CIDR
         SSH_CIDR=${SSH_CIDR:-0.0.0.0/0}
-        echo -e "${YELLOW}Opening SSH port 22 in security group $SECURITY_GROUP for $SSH_CIDR...${NC}"
-        aws ec2 authorize-security-group-ingress \
-            --group-id "$SECURITY_GROUP" \
-            --protocol tcp \
-            --port 22 \
-            --cidr "$SSH_CIDR"
-        echo -e "${GREEN}✅ SSH port 22 opened in security group for $SSH_CIDR${NC}"
+        
+        # Check if the rule already exists
+        if ! aws ec2 describe-security-groups \
+            --group-ids "$SECURITY_GROUP" \
+            --query "SecurityGroups[0].IpPermissions[?contains(FromPort, \`22\`) && contains(ToPort, \`22\`) && contains(IpRanges[].CidrIp, \`$SSH_CIDR\`)]" \
+            --output text | grep -q .; then
+            
+            echo -e "${YELLOW}Opening SSH port 22 in security group $SECURITY_GROUP for $SSH_CIDR...${NC}"
+            aws ec2 authorize-security-group-ingress \
+                --group-id "$SECURITY_GROUP" \
+                --protocol tcp \
+                --port 22 \
+                --cidr "$SSH_CIDR"
+            echo -e "${GREEN}✅ SSH port 22 opened in security group for $SSH_CIDR${NC}"
+        else
+            echo -e "${GREEN}✅ SSH port 22 is already open in security group for $SSH_CIDR${NC}"
+        fi
     fi
 
     echo -e "${GREEN}✅ cluster-config.json created successfully${NC}"
