@@ -56,7 +56,6 @@ The key resources created by the template include:
 - *(Optional)* **SSM Session Manager Document**:
     - Named SSM-SessionManagerRunShellAsUbuntu
     - Configures default session user as ubuntu
-- *(Optional)* **EC2 Key Pair** creation for SSH access
 
 ### **5. S3**
 
@@ -93,8 +92,6 @@ The key resources created by the template include:
 | `OpenZFSThroughput` | `160` | OpenZFS throughput (MB/s) |
 | `OpenZFSStorageCapacity` | `64` | OpenZFS capacity (GiB) |
 | `SSMDocumentName` | `true` | Create SSM session document |
-| `CreateKeyPair` | `false` | Create EC2 key pair |
-| `KeyPairName` | `hyperpod-key` | Key pair name (if created) |
 
 > 💡 **Note:** AZ IDs vary by region. Check [this AWS doc](https://docs.aws.amazon.com/ko_kr/ram/latest/userguide/working-with-az-ids.html) to find valid AZ IDs for your region.
 
@@ -119,7 +116,6 @@ After deployment, the stack will export the following resources:
 | `FSxOpenZFSFileSystemDNSname` | *(Optional)* OpenZFS DNS name |
 | `AmazonSagemakerClusterExecutionRoleArn` | ARN of the IAM role |
 | `AmazonS3BucketName` | S3 bucket for lifecycle scripts |
-| `KeyPairName` | *(Optional)* Name of the created EC2 key pair |
 
 ---
 
