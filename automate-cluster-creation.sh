@@ -650,24 +650,55 @@ EOL
         read -e -p "Enter CIDR to allow SSH access (Default: 0.0.0.0/0): " SSH_CIDR
         SSH_CIDR=${SSH_CIDR:-0.0.0.0/0}
         
-        # Check if the rule already exists
+        # 더 정확한 방법으로 기존 규칙 확인
+        echo -e "${YELLOW}Checking if SSH port 22 is already open in security group $SECURITY_GROUP for $SSH_CIDR...${NC}"
+        
+        # 특정 CIDR에 대한 SSH 규칙이 이미 존재하는지 확인
         EXISTING_RULE=$(aws ec2 describe-security-groups \
             --group-ids "$SECURITY_GROUP" \
-            --query "SecurityGroups[0].IpPermissions[?Protocol=='tcp' && FromPort==\`22\` && ToPort==\`22\` && length(IpRanges[?CidrIp=='$SSH_CIDR']) > \`0\`]" \
+            --filters "Name=ip-permission.from-port,Values=22" \
+                    "Name=ip-permission.to-port,Values=22" \
+                    "Name=ip-permission.protocol,Values=tcp" \
+                    "Name=ip-permission.cidr,Values=$SSH_CIDR" \
+            --query "SecurityGroups[0].IpPermissions" \
             --output text)
-
+        
         if [ -z "$EXISTING_RULE" ]; then
             echo -e "${YELLOW}Opening SSH port 22 in security group $SECURITY_GROUP for $SSH_CIDR...${NC}"
-            aws ec2 authorize-security-group-ingress \
+            if aws ec2 authorize-security-group-ingress \
                 --group-id "$SECURITY_GROUP" \
                 --protocol tcp \
                 --port 22 \
-                --cidr "$SSH_CIDR"
-            echo -e "${GREEN}✅ SSH port 22 opened in security group for $SSH_CIDR${NC}"
+                --cidr "$SSH_CIDR"; then
+                echo -e "${GREEN}✅ SSH port 22 opened in security group for $SSH_CIDR${NC}"
+            else
+                echo -e "${YELLOW}⚠️  Failed to open SSH port. The rule may already exist or you may not have permission.${NC}"
+            fi
         else
             echo -e "${GREEN}✅ SSH port 22 is already open in security group for $SSH_CIDR${NC}"
         fi
+        
+        # cluster-config.json 파일에 SSH 키 페어 추가
+        # jq를 사용하여 기존 JSON 파일 수정
+        if command -v jq &> /dev/null; then
+            echo -e "${YELLOW}Adding SSH key pair to cluster configuration...${NC}"
+            jq --arg key "$SSH_KEY_NAME" '.SshKeyName = $key | .VpcConfig.AssignPublicIp = true' cluster-config.json > cluster-config-temp.json
+            mv cluster-config-temp.json cluster-config.json
+            echo -e "${GREEN}✅ SSH key pair added to cluster configuration${NC}"
+        else
+            echo -e "${YELLOW}jq not found. Manually adding SSH key pair to cluster configuration...${NC}"
+            # 기존 파일을 백업
+            cp cluster-config.json cluster-config.json.bak
+            
+            # 파일 내용 수정
+            sed -i.bak 's/"ClusterName": "'"$CLUSTER_NAME"'"/"ClusterName": "'"$CLUSTER_NAME"'",\n    "SshKeyName": "'"$SSH_KEY_NAME"'"/' cluster-config.json
+            sed -i.bak 's/"Subnets":\["'"$SUBNET_ID"'"\]/"Subnets":\["'"$SUBNET_ID"'"\],\n        "AssignPublicIp": true/' cluster-config.json
+            
+            rm -f cluster-config.json.bak
+            echo -e "${GREEN}✅ SSH key pair added to cluster configuration${NC}"
+        fi
     fi
+
 
     echo -e "${GREEN}✅ cluster-config.json created successfully${NC}"
 
