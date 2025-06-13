@@ -651,11 +651,12 @@ EOL
         SSH_CIDR=${SSH_CIDR:-0.0.0.0/0}
         
         # Check if the rule already exists
-        if ! aws ec2 describe-security-groups \
+        EXISTING_RULE=$(aws ec2 describe-security-groups \
             --group-ids "$SECURITY_GROUP" \
-            --query "SecurityGroups[0].IpPermissions[?contains(FromPort, \`22\`) && contains(ToPort, \`22\`) && contains(IpRanges[].CidrIp, \`$SSH_CIDR\`)]" \
-            --output text | grep -q .; then
-            
+            --query "SecurityGroups[0].IpPermissions[?Protocol=='tcp' && FromPort==\`22\` && ToPort==\`22\` && length(IpRanges[?CidrIp=='$SSH_CIDR']) > \`0\`]" \
+            --output text)
+
+        if [ -z "$EXISTING_RULE" ]; then
             echo -e "${YELLOW}Opening SSH port 22 in security group $SECURITY_GROUP for $SSH_CIDR...${NC}"
             aws ec2 authorize-security-group-ingress \
                 --group-id "$SECURITY_GROUP" \
